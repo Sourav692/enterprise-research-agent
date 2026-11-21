@@ -111,21 +111,21 @@ To export PNGs: `npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/ar
 
 ## Agents
 
-| Node | Role | Model tier | Failure behaviour |
-|---|---|---|---|
-| `contextualize` | Summarises long histories (keeps last N messages + running summary) and rewrites follow-ups ("what about it?") into standalone questions | fast | falls back to the raw message + warning |
-| `classify` | Routes to `internal` / `web` / `both` / `clarify` / `direct`; writes separate internal and web queries (the web query must not contain confidential names) | fast | **fails open** to `both` + warning |
-| `clarify` | `interrupt()`s with one specific question; on resume merges the answer and re-classifies (max 2 per turn) | – | – |
-| `privacy_guard` | Scans the outgoing web query for confidential terms (declared in confidential docs' front-matter + config); `interrupt()`s for approval. Rejection skips the web and falls back to internal | – | – |
-| `retrieve_internal` | ChromaDB similarity search (cosine, top-k chunks with doc metadata, classification and date) | – | retried with backoff; on exhaustion returns empty + warning |
-| `search_web` | Tavily search (advanced depth) | – | retried with backoff; outage, so internal-only answer + warning |
-| `validate` | Merges and dedupes evidence, assigns citation ids `S1..Sn`, grades relevance and drops off-topic passages | fast | falls back to similarity-score threshold |
-| `reformulate` | When nothing relevant was found, rewrites the queries (synonyms, broader terms) and loops back (max 1 retry) | fast | reuses original query |
-| `detect_conflicts` | Compares internal vs external evidence; returns structured conflicts with source ids on both sides and which side is likely current (uses document dates) | smart | skipped + warning |
-| `synthesize` | Writes the markdown answer using **only** the evidence; every factual sentence carries `[Sx]` markers; lists atomic claims with supporting ids; reports gaps and confidence. Unknown citation ids are stripped. With no evidence it **abstains deterministically** (no LLM call) | smart | extractive fallback answer, confidence capped at 0.4, + warning |
-| `check_groundedness` | Deterministic check (each claim must cite something) + LLM verification of each claim against its cited text. Unsupported claims are fed back to `synthesize` for one regeneration | fast | score 0.5 + warning |
-| `approval_gate` | `interrupt()`s when the answer cites **confidential** documents or confidence/groundedness is below threshold. Rejection withholds the answer | – | – |
-| `finalize` | Appends the structured conflicts section, unverified-claim warnings, gaps and the source list; stores the assistant message | – | – |
+| Node                   | Role                                                                                                                                                                                                                                                                                           | Model tier | Failure behaviour                                               |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------- |
+| `contextualize`      | Summarises long histories (keeps last N messages + running summary) and rewrites follow-ups ("what about it?") into standalone questions                                                                                                                                                       | fast       | falls back to the raw message + warning                         |
+| `classify`           | Routes to `internal` / `web` / `both` / `clarify` / `direct`; writes separate internal and web queries (the web query must not contain confidential names)                                                                                                                           | fast       | **fails open** to `both` + warning                      |
+| `clarify`            | `interrupt()`s with one specific question; on resume merges the answer and re-classifies (max 2 per turn)                                                                                                                                                                                    | –         | –                                                              |
+| `privacy_guard`      | Scans the outgoing web query for confidential terms (declared in confidential docs' front-matter + config); `interrupt()`s for approval. Rejection skips the web and falls back to internal                                                                                                  | –         | –                                                              |
+| `retrieve_internal`  | ChromaDB similarity search (cosine, top-k chunks with doc metadata, classification and date)                                                                                                                                                                                                   | –         | retried with backoff; on exhaustion returns empty + warning     |
+| `search_web`         | Tavily search (advanced depth)                                                                                                                                                                                                                                                                 | –         | retried with backoff; outage, so internal-only answer + warning |
+| `validate`           | Merges and dedupes evidence, assigns citation ids `S1..Sn`, grades relevance and drops off-topic passages                                                                                                                                                                                    | fast       | falls back to similarity-score threshold                        |
+| `reformulate`        | When nothing relevant was found, rewrites the queries (synonyms, broader terms) and loops back (max 1 retry)                                                                                                                                                                                   | fast       | reuses original query                                           |
+| `detect_conflicts`   | Compares internal vs external evidence; returns structured conflicts with source ids on both sides and which side is likely current (uses document dates)                                                                                                                                      | smart      | skipped + warning                                               |
+| `synthesize`         | Writes the markdown answer using **only** the evidence; every factual sentence carries `[Sx]` markers; lists atomic claims with supporting ids; reports gaps and confidence. Unknown citation ids are stripped. With no evidence it **abstains deterministically** (no LLM call) | smart      | extractive fallback answer, confidence capped at 0.4, + warning |
+| `check_groundedness` | Deterministic check (each claim must cite something) + LLM verification of each claim against its cited text. Unsupported claims are fed back to `synthesize` for one regeneration                                                                                                           | fast       | score 0.5 + warning                                             |
+| `approval_gate`      | `interrupt()`s when the answer cites **confidential** documents or confidence/groundedness is below threshold. Rejection withholds the answer                                                                                                                                          | –         | –                                                              |
+| `finalize`           | Appends the structured conflicts section, unverified-claim warnings, gaps and the source list; stores the assistant message                                                                                                                                                                    | –         | –                                                              |
 
 ## State management
 
@@ -140,12 +140,12 @@ Checkpoints are written to SQLite by `SqliteSaver` after every superstep, so a t
 
 ## Human-in-the-loop
 
-| Approval type | Trigger | Mechanism | On reject |
-|---|---|---|---|
-| `external_search_privacy` | Web query contains confidential terms | graph `interrupt()` in `privacy_guard` | web search skipped, answer from internal sources |
-| `confidential_data` | Answer cites a `classification: confidential` document | graph `interrupt()` in `approval_gate` | answer withheld |
-| `low_confidence` | `confidence < 0.45` or `groundedness < 0.7` | graph `interrupt()` in `approval_gate` | answer withheld |
-| `kb_write` / `kb_delete` | `POST /documents`, `DELETE /documents/{id}` | approval row in SQLite (no graph) | nothing changes |
+| Approval type                | Trigger                                                  | Mechanism                                  | On reject                                        |
+| ---------------------------- | -------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------ |
+| `external_search_privacy`  | Web query contains confidential terms                    | graph `interrupt()` in `privacy_guard` | web search skipped, answer from internal sources |
+| `confidential_data`        | Answer cites a `classification: confidential` document | graph `interrupt()` in `approval_gate` | answer withheld                                  |
+| `low_confidence`           | `confidence < 0.45` or `groundedness < 0.7`          | graph `interrupt()` in `approval_gate` | answer withheld                                  |
+| `kb_write` / `kb_delete` | `POST /documents`, `DELETE /documents/{id}`          | approval row in SQLite (no graph)          | nothing changes                                  |
 
 `ResearchService` converts a pending interrupt into `status: pending_approval` with an approval id (derived from the interrupt id, so it's idempotent) and records it in the `approvals` table. A reviewer decides via `POST /approvals/{id}` or `POST /chat/{thread_id}/resume`; the graph resumes with `Command(resume=...)`. Each gate can be switched off with `HITL_*` settings.
 

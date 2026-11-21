@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research Agent Guide</title>
+<style>
+  :root {
+    --bg: #ffffff; --text: #1f2328; --muted: #59636e; --border: #d1d9e0;
+    --edge: #8c959f; --accent: #0969da; --accent-bg: rgba(9,105,218,0.12);
+    --code-bg: #f6f8fa; --row: #f6f8fa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0d1117; --text: #e6edf3; --muted: #9198a1; --border: #3d444d;
+      --edge: #6e7681; --accent: #4493f8; --accent-bg: rgba(68,147,248,0.15);
+      --code-bg: #151b23; --row: #151b23; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 2rem; line-height: 1.25; margin: 0 0 4px; }
+  h2 { font-size: 1.4rem; margin: 2.2em 0 0.6em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  .byline { color: var(--muted); margin: 0 0 1.5em; }
+  nav { background: var(--row); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; }
+  nav ol { margin: 0; padding-left: 1.2em; }
+  a { color: var(--accent); }
+  code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code-bg);
+    padding: 0.15em 0.35em; border-radius: 4px; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; margin: 1em 0; }
+  th, td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--row); }
+  figure { margin: 1.5em 0; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption { color: var(--muted); font-size: 0.85rem; text-align: center; margin-top: 6px; }
+  svg .box { fill: none; stroke: var(--edge); stroke-width: 1.25; }
+  svg .pause { stroke-dasharray: 5 4; }
+  svg .main { fill: var(--accent-bg); stroke: var(--accent); stroke-width: 2; }
+  svg .ink { fill: var(--text); }
+  svg .quiet { fill: var(--muted); font-size: 11.5px; }
+  svg .bold { font-weight: 600; }
+  svg .lines { fill: none; stroke: var(--edge); stroke-width: 1.25; }
+  svg .arrowhead { fill: var(--edge); }
+  svg text { font-family: inherit; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Enterprise Research Agent: 1000 ft Tutor Guide</h1>
+<p class="byline">As of 2026-11-21. A high-level guide to what this project is and how the agent works end to end.</p>
+
+<nav><ol>
+  <li><a href="#what">What this project is</a></li>
+  <li><a href="#big-picture">The big picture</a></li>
+  <li><a href="#end-to-end">One question, end to end</a></li>
+  <li><a href="#agents">Meet the agents</a></li>
+  <li><a href="#stack">Tech stack at a glance</a></li>
+  <li><a href="#run">How to run it and where to look</a></li>
+  <li><a href="#concepts">Key concepts</a></li>
+</ol></nav>
+
+<h2 id="what">1. What this project is</h2>
+<p>It is a research assistant for a made-up fintech company, <strong>LedgerLeaf Payments</strong>. Employees ask it questions in plain English. It finds the answer in the company's internal documents, on the web, or in both, and cites a source for every claim.</p>
+<p>Think of it as a careful junior analyst who:</p>
+<ul>
+  <li><strong>checks the company wiki first</strong> (21 internal documents: policies, reports, pricing, board minutes)</li>
+  <li><strong>searches the web</strong> when the question needs current, outside information</li>
+  <li><strong>points out disagreements</strong>, for example "our 2025 doc says a competitor charges 2.4%, but a 2026 article says 1.9%"</li>
+  <li><strong>asks a follow-up</strong> when the question is too vague ("What's the limit?" gets the reply "Which limit?")</li>
+  <li><strong>remembers the conversation</strong>, so "And what credits do we get?" makes sense after a question about the SLA</li>
+  <li><strong>asks a human first</strong> before it does anything sensitive, such as using confidential documents or sending an internal project name to a web search engine</li>
+  <li><strong>refuses to make things up</strong>: when it finds no evidence, it says so</li>
+</ul>
+<p>One word you will see a lot: it is a <strong>multi-agent</strong> system. That does not mean many chatbots talking to each other. It means one pipeline split into about 10 small, focused steps ("agents"). Each step has one job, and a coordinator decides which step runs next.</p>
+<p>It also <strong>runs without any API keys</strong>. With no keys, a built-in offline "fake LLM" and canned web results stand in, so you can try the whole flow on your laptop for free.</p>
+
+<h2 id="big-picture">2. The big picture</h2>
+<p>The system has four layers. A request enters at the top and the agent pipeline does the thinking. The bottom row holds the outside services and storage that the pipeline calls.</p>
+<figure>
+<svg viewBox="0 0 760 480" role="img" aria-label="Every question flows through one service into the agent pipeline">
+  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker></defs>
+  <text x="24" y="32" class="ink bold" style="font-size:15px">Every question flows through one service into the agent pipeline</text>
+  <g class="lines">
+    <path d="M200 92H272" marker-end="url(#a1)"/><path d="M488 92H552" marker-end="url(#a1)"/>
+    <path d="M650 120V196" marker-end="url(#a1)"/><path d="M260 308V356" marker-end="url(#a1)"/>
+    <path d="M380 308V356" marker-end="url(#a1)"/><path d="M500 308V356" marker-end="url(#a1)"/>
+    <path d="M620 308V356" marker-end="url(#a1)"/>
+  </g>
+  <rect class="box" x="24" y="64" width="176" height="56" rx="8"/>
+  <text x="112" y="88" text-anchor="middle" class="ink bold">You</text>
+  <text x="112" y="106" text-anchor="middle" class="quiet">CLI chat or HTTP client</text>
+  <rect class="box" x="272" y="64" width="216" height="56" rx="8"/>
+  <text x="380" y="88" text-anchor="middle" class="ink bold">FastAPI web server</text>
+  <text x="380" y="106" text-anchor="middle" class="quiet">/chat, /approvals, /documents</text>
+  <rect class="box" x="552" y="64" width="184" height="56" rx="8"/>
+  <text x="644" y="88" text-anchor="middle" class="ink bold">ResearchService</text>
+  <text x="644" y="106" text-anchor="middle" class="quiet">threads, pauses, approvals</text>
+  <rect class="main" x="24" y="196" width="712" height="112" rx="8"/>
+  <text x="380" y="224" text-anchor="middle" class="ink bold" style="font-size:14px">LangGraph agent pipeline (the brain)</text>
+  <text x="380" y="250" text-anchor="middle" class="ink">~10 small agents: understand, route, retrieve, check, write, verify</text>
+  <text x="380" y="272" text-anchor="middle" class="ink">Shared notebook (state) passed from step to step</text>
+  <text x="380" y="292" text-anchor="middle" class="quiet">Can pause for a human and resume later</text>
+  <rect class="box" x="184" y="356" width="152" height="72" rx="8"/>
+  <text x="260" y="382" text-anchor="middle" class="ink bold">LLM (OpenRouter)</text>
+  <text x="260" y="400" text-anchor="middle" class="quiet">Sonnet: smart steps</text>
+  <text x="260" y="416" text-anchor="middle" class="quiet">Haiku: fast steps</text>
+  <rect class="box" x="344" y="356" width="72" height="72" rx="8"/>
+  <text x="380" y="388" text-anchor="middle" class="ink bold">Chroma</text>
+  <text x="380" y="406" text-anchor="middle" class="quiet">doc index</text>
+  <rect class="box" x="424" y="356" width="152" height="72" rx="8"/>
+  <text x="500" y="382" text-anchor="middle" class="ink bold">Tavily web search</text>
+  <text x="500" y="400" text-anchor="middle" class="quiet">live internet results</text>
+  <rect class="box" x="584" y="356" width="152" height="72" rx="8"/>
+  <text x="660" y="382" text-anchor="middle" class="ink bold">SQLite</text>
+  <text x="660" y="400" text-anchor="middle" class="quiet">chat memory, approvals,</text>
+  <text x="660" y="416" text-anchor="middle" class="quiet">audit log, metrics</text>
+  <text x="24" y="460" class="quiet">No API keys? A built-in mock LLM and canned web results replace OpenRouter and Tavily.</text>
+</svg>
+<figcaption>System architecture: 4 layers</figcaption>
+</figure>
+<ul>
+  <li><strong>Front door (FastAPI):</strong> a normal web API. You send a question to <code>POST /chat</code> and get back an answer with citations, or a status that says "I need more information" or "I need approval".</li>
+  <li><strong>Manager (ResearchService):</strong> tracks each conversation (a <em>thread</em>). When the pipeline pauses, it turns the pause into an API status and records approval requests.</li>
+  <li><strong>Brain (LangGraph pipeline):</strong> a flowchart of agents. Each agent reads a shared notebook (the <em>state</em>), does its one job, and writes its result back.</li>
+  <li><strong>Tools and storage:</strong> the LLM writes and judges text. Chroma searches the internal documents by meaning. Tavily searches the web. SQLite remembers everything between requests.</li>
+</ul>
+
+<h2 id="end-to-end">3. One question, end to end</h2>
+<p>The question "How do PayNova's current fees compare to our pricing?" passes about ten checkpoints. It is one of the project's demo questions, and it needs both internal documents and the web.</p>
+<figure>
+<svg viewBox="0 0 760 470" role="img" aria-label="A question passes about ten checkpoints before an answer goes out">
+  <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker></defs>
+  <text x="24" y="30" class="ink bold" style="font-size:15px">A question passes about ten checkpoints before an answer goes out</text>
+  <g class="lines">
+    <path d="M174 100H206" marker-end="url(#a2)"/><path d="M354 100H386" marker-end="url(#a2)"/>
+    <path d="M534 100H552V70H570" marker-end="url(#a2)"/><path d="M534 100H552V130H570" marker-end="url(#a2)"/>
+    <path d="M718 70H740V290H718" marker-end="url(#a2)"/><path d="M718 130H740"/>
+    <path d="M262 122V174" marker-end="url(#a2)"/><path d="M298 174V122" marker-end="url(#a2)"/>
+    <path d="M220 122V150H100V174" marker-end="url(#a2)"/>
+    <path d="M644 268V232" marker-end="url(#a2)"/><path d="M570 210H460V122" marker-end="url(#a2)"/>
+    <path d="M570 290H534" marker-end="url(#a2)"/><path d="M386 290H354" marker-end="url(#a2)"/>
+    <path d="M206 290H174" marker-end="url(#a2)"/><path d="M100 268V250H280V268" marker-end="url(#a2)"/>
+    <path d="M100 312V358" marker-end="url(#a2)"/><path d="M174 380H206" marker-end="url(#a2)"/>
+    <path d="M354 380H386" marker-end="url(#a2)"/>
+  </g>
+  <rect class="box" x="26" y="78" width="148" height="44" rx="8"/><text x="100" y="104" text-anchor="middle" class="ink">Contextualize</text>
+  <rect class="box" x="206" y="78" width="148" height="44" rx="8"/><text x="280" y="104" text-anchor="middle" class="ink">Classify and route</text>
+  <rect class="box pause" x="386" y="78" width="148" height="44" rx="8"/><text x="460" y="104" text-anchor="middle" class="ink">Privacy guard</text>
+  <rect class="box" x="570" y="48" width="148" height="44" rx="8"/><text x="644" y="74" text-anchor="middle" class="ink">Internal docs (RAG)</text>
+  <rect class="box" x="570" y="108" width="148" height="44" rx="8"/><text x="644" y="134" text-anchor="middle" class="ink">Web search</text>
+  <rect class="box" x="26" y="174" width="148" height="44" rx="8"/><text x="100" y="200" text-anchor="middle" class="ink">Direct reply</text>
+  <rect class="box pause" x="206" y="174" width="148" height="44" rx="8"/><text x="280" y="200" text-anchor="middle" class="ink">Ask to clarify</text>
+  <rect class="box" x="570" y="188" width="148" height="44" rx="8"/><text x="644" y="214" text-anchor="middle" class="ink">Reformulate query</text>
+  <rect class="box" x="570" y="268" width="148" height="44" rx="8"/><text x="644" y="294" text-anchor="middle" class="ink">Validate evidence</text>
+  <rect class="box" x="386" y="268" width="148" height="44" rx="8"/><text x="460" y="294" text-anchor="middle" class="ink">Detect conflicts</text>
+  <rect class="box" x="206" y="268" width="148" height="44" rx="8"/><text x="280" y="294" text-anchor="middle" class="ink">Write cited answer</text>
+  <rect class="box" x="26" y="268" width="148" height="44" rx="8"/><text x="100" y="294" text-anchor="middle" class="ink">Groundedness check</text>
+  <rect class="box pause" x="26" y="358" width="148" height="44" rx="8"/><text x="100" y="384" text-anchor="middle" class="ink">Approval gate</text>
+  <rect class="box" x="206" y="358" width="148" height="44" rx="8"/><text x="280" y="384" text-anchor="middle" class="ink">Finalize</text>
+  <rect class="main" x="386" y="358" width="148" height="44" rx="8"/><text x="460" y="384" text-anchor="middle" class="ink bold">Answer to you</text>
+  <text x="515" y="202" text-anchor="middle" class="quiet">no hits: retry</text>
+  <text x="190" y="244" text-anchor="middle" class="quiet">unsupported claim: rewrite</text>
+  <text x="160" y="144" text-anchor="middle" class="quiet">small talk</text>
+  <rect class="box pause" x="24" y="428" width="28" height="16" rx="4"/>
+  <text x="62" y="440" class="quiet">Dashed = can pause and wait for a human, then resume from saved state</text>
+</svg>
+<figcaption>One question, end to end: 13 steps, 3 loops, 3 pause points</figcaption>
+</figure>
+<ol>
+  <li><strong>Contextualize.</strong> The agent reads the conversation so far. If you had asked "and theirs?", it would rewrite that into a full, standalone question.</li>
+  <li><strong>Classify and route.</strong> A fast LLM picks one of five routes: <code>internal</code>, <code>web</code>, <code>both</code>, <code>clarify</code> or <code>direct</code>. This question gets <code>both</code>. The router also writes two separate search queries, one for the internal docs and one for the web.</li>
+  <li><strong>Privacy guard.</strong> The web query is about to leave the company, so the agent checks it for confidential terms such as "Project Falcon". If it finds one, it pauses for a human. This query is clean, so it continues.</li>
+  <li><strong>Retrieve, in parallel.</strong> Internal RAG searches Chroma and returns the internal pricing chunks. Web search pulls current articles about PayNova. Both run at the same time.</li>
+  <li><strong>Validate.</strong> The agent merges the results, drops off-topic passages and numbers the rest as sources <code>S1</code>, <code>S2</code> and so on. If nothing relevant came back, it rewrites the query and tries once more.</li>
+  <li><strong>Detect conflicts.</strong> The internal 2025 competitor analysis says PayNova charges 2.4%. A 2026 web article says 1.9%. The agent records this as a conflict and uses the dates to judge which is likely current.</li>
+  <li><strong>Write the answer.</strong> A smart LLM writes the answer from the evidence only. Every factual sentence carries a <code>[S#]</code> citation, and the answer lists its claims one by one.</li>
+  <li><strong>Groundedness check.</strong> Each claim is checked against the source it cites. An unsupported claim sends the answer back for one rewrite. If the rewrite still fails, the claim gets a visible "could not be verified" warning.</li>
+  <li><strong>Approval gate.</strong> If the answer uses confidential documents or its confidence is low, it pauses for a reviewer. This answer passes.</li>
+  <li><strong>Finalize.</strong> The agent adds a conflicts section, the source list and any warnings, saves the message to memory and returns it.</li>
+</ol>
+<p>A pause is not a crash. The API replies with <code>needs_clarification</code> or <code>pending_approval</code>. Everything is saved in SQLite, so the conversation resumes from the same point when someone answers, even after a server restart.</p>
+
+<h2 id="agents">4. Meet the agents</h2>
+<p>Each agent is one small Python function with one job. Most of them call the LLM, but some are plain code. "Fast" agents use a cheaper model (Haiku) for high-volume sorting and grading work. "Smart" agents use a stronger model (Sonnet) for writing and reasoning.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Agent</th><th>Its one job</th><th>Model</th><th>If it fails</th></tr></thead>
+  <tbody>
+    <tr><td>Contextualizer</td><td>Turns follow-ups into standalone questions and summarises long chats</td><td>fast</td><td>uses your raw message</td></tr>
+    <tr><td>Router / Classifier</td><td>Picks the route and writes separate internal and web queries</td><td>fast</td><td>searches both ("fails open")</td></tr>
+    <tr><td>Clarify</td><td>Asks you one specific question, then re-routes</td><td>none</td><td>at most 2 per turn</td></tr>
+    <tr><td>Privacy guard</td><td>Stops confidential names from leaking into web searches</td><td>none</td><td>reviewer decides</td></tr>
+    <tr><td>Internal RAG</td><td>Searches the company docs by meaning</td><td>none</td><td>retries, then returns nothing plus a warning</td></tr>
+    <tr><td>Web research</td><td>Searches the internet via Tavily</td><td>none</td><td>retries, then answers from internal docs only</td></tr>
+    <tr><td>Validator</td><td>Keeps relevant evidence, numbers the sources</td><td>fast</td><td>keeps results above a similarity score</td></tr>
+    <tr><td>Reformulator</td><td>Rewrites a query that found nothing</td><td>fast</td><td>reuses the original query</td></tr>
+    <tr><td>Conflict detector</td><td>Finds internal vs web disagreements</td><td>smart</td><td>skipped, plus a warning</td></tr>
+    <tr><td>Synthesizer</td><td>Writes the cited answer from the evidence only</td><td>smart</td><td>builds a simpler answer by quoting the sources</td></tr>
+    <tr><td>Groundedness checker</td><td>Checks every claim against its cited source</td><td>fast</td><td>neutral score, plus a warning</td></tr>
+    <tr><td>Approval gate</td><td>Holds confidential or low-confidence answers for a human</td><td>none</td><td>answer withheld if rejected</td></tr>
+  </tbody>
+</table></div>
+<p>The last column is the key design idea. No single failure crashes the system. Each agent has a fallback, and the user sees a warning in the answer.</p>
+
+<h2 id="stack">5. Tech stack at a glance</h2>
+<p>The whole system is Python 3.11 to 3.13. Each tool below fills one role.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Role</th><th>Tool</th><th>Why it is here</th></tr></thead>
+  <tbody>
+    <tr><td>Orchestration</td><td>LangGraph</td><td>Runs the agent flowchart, parallel branches, loops and human pauses</td></tr>
+    <tr><td>LLM gateway</td><td>OpenRouter (via langchain-openai)</td><td>One API for many models. Defaults are Claude Sonnet 5.5 (smart) and Haiku 5.5 (fast)</td></tr>
+    <tr><td>Offline LLM</td><td>Built-in MockLLM</td><td>Keyword and heuristic stand-in, so everything runs with no keys</td></tr>
+    <tr><td>Vector database</td><td>ChromaDB</td><td>Stores document chunks for search by meaning</td></tr>
+    <tr><td>Embeddings</td><td>bge-small (HuggingFace, about 130 MB)</td><td>Turns text into vectors, locally</td></tr>
+    <tr><td>Web search</td><td>Tavily</td><td>Live web results. Offline, it uses canned results from <code>data/mock_web/</code></td></tr>
+    <tr><td>API</td><td>FastAPI + Swagger UI</td><td>HTTP endpoints with auto-generated docs at <code>/docs</code></td></tr>
+    <tr><td>Data shapes</td><td>Pydantic</td><td>Typed state and a fixed output format for every LLM call</td></tr>
+    <tr><td>Memory</td><td>SQLite</td><td>Conversation checkpoints, approvals, audit log and metrics</td></tr>
+    <tr><td>Reliability</td><td>tenacity</td><td>Retries with exponential backoff on every outside call</td></tr>
+    <tr><td>Logging</td><td>structlog (+ optional LangSmith)</td><td>Logs tagged with request and thread IDs, plus full traces</td></tr>
+    <tr><td>CLI</td><td>typer + rich</td><td>The <code>research-agent</code> command</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="run">6. How to run it and where to look</h2>
+<p>Four commands get it running. API keys are optional.</p>
+<pre><code>uv sync --extra local-embeddings      # install
+uv run research-agent ingest --reset  # index the 21 docs into Chroma
+uv run research-agent serve           # API at http://127.0.0.1:8000/docs
+uv run research-agent chat            # or chat in the terminal</code></pre>
+<p>Add <code>OPENROUTER_API_KEY</code> and <code>TAVILY_API_KEY</code> to <code>.env</code> to switch from mock mode to real models and real web search. <code>GET /health</code> shows which mode is active. Other useful commands:</p>
+<ul>
+  <li><code>uv run python scripts/demo.py</code> runs 10 demo scenarios and writes <code>docs/DEMO.md</code>. This is the best way to see every feature.</li>
+  <li><code>uv run python -m research_agent.evaluation</code> scores the system on 30 labelled questions.</li>
+  <li><code>uv run pytest</code> runs 55 offline tests.</li>
+</ul>
+<p>A suggested reading order for the code:</p>
+<ol>
+  <li><code>README.md</code> and <code>docs/ARCHITECTURE.md</code>: the official overview</li>
+  <li><code>src/research_agent/graph/builder.py</code>: the flowchart itself. Every node and route is wired here.</li>
+  <li><code>src/research_agent/graph/state.py</code>: the shared notebook every agent reads and writes</li>
+  <li><code>src/research_agent/agents/</code>: one file per agent, with all prompts in <code>prompts.py</code></li>
+  <li><code>src/research_agent/service.py</code>: how pauses become API statuses and how approvals resume the graph</li>
+  <li><code>src/research_agent/rag/</code>: how documents are loaded, chunked and embedded</li>
+  <li><code>data/docs/</code>: the fake company's knowledge base. It includes deliberately outdated and confidential files to trigger conflicts and approvals.</li>
+</ol>
+
+<h2 id="concepts">7. Key concepts</h2>
+<p>These eight terms cover most of what you need to talk about this project.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Term</th><th>Plain meaning</th></tr></thead>
+  <tbody>
+    <tr><td>RAG</td><td>Retrieval-Augmented Generation. The system finds relevant document passages first, then the LLM answers using only those passages.</td></tr>
+    <tr><td>Embedding / vector search</td><td>Text becomes a list of numbers, so the system can find passages with similar meaning, not just matching words.</td></tr>
+    <tr><td>Chunking</td><td>Long documents are split into small, header-aware pieces so search returns focused passages.</td></tr>
+    <tr><td>Graph (LangGraph)</td><td>The workflow drawn as boxes (nodes) and arrows (edges). Some arrows are conditional, some loop back, and some run in parallel.</td></tr>
+    <tr><td>State</td><td>The shared notebook that moves through the graph: the question, the route, the evidence, the draft answer, warnings.</td></tr>
+    <tr><td>Interrupt / HITL</td><td>Human-in-the-loop. The graph pauses, saves itself and waits for a person to answer or approve.</td></tr>
+    <tr><td>Groundedness</td><td>Whether every claim in the answer is supported by the source it cites. This is the main guard against hallucination.</td></tr>
+    <tr><td>Structured output</td><td>The LLM must reply in a fixed JSON format (a Pydantic schema), so code can read the reply reliably.</td></tr>
+  </tbody>
+</table></div>
+<p>The project rests on three design choices:</p>
+<ol>
+  <li><strong>A fixed flowchart, not a free-roaming agent.</strong> The route is predictable, testable and easy to draw, but the loops still let it retry and self-correct.</li>
+  <li><strong>Trust is earned at each step.</strong> The agent validates evidence, checks claims, flags conflicts, and holds confidential or low-confidence answers for a human.</li>
+  <li><strong>Every step has a fallback.</strong> Outages and bad outputs reduce quality, but they do not crash the system. The user always sees a warning.</li>
+</ol>
+</main>
+</body>
+</html>
