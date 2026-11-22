@@ -23,20 +23,21 @@ question ─► contextualize ─► classify ─┬─► clarify ⏸ ──►
                                                                                             └─────────────────────┴─► synthesize ⇄ groundedness check
                                                                                                                           └─► approval gate ⏸ ─► finalize
 ```
+
 ⏸ = LangGraph `interrupt()`: the API returns `needs_clarification` / `pending_approval`, and the conversation resumes from its SQLite checkpoint.
 
-| Agent | Job |
-|---|---|
-| **Contextualizer** | rewrites follow-ups into standalone questions; summarises long histories |
-| **Router/Classifier** | `internal` / `web` / `both` / `clarify` / `direct`, with separate internal and web queries |
-| **Privacy guard** | stops confidential terms from leaking into external web queries without approval |
-| **Internal RAG agent** | ChromaDB semantic search over chunked docs with classification and date metadata |
-| **Web research agent** | Tavily search |
-| **Validator** | grades relevance and drops noise; triggers query reformulation when nothing is relevant |
-| **Conflict detector** | structured internal vs external disagreements, with dates and likely resolution |
-| **Synthesizer** | evidence-only answer with `[S#]` citations and an explicit claim list |
-| **Groundedness checker** | verifies each claim against its cited source; forces regeneration on hallucinations |
-| **Approval gate** | human review for confidential sources or low-confidence answers |
+| Agent                          | Job                                                                                                  |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| **Contextualizer**       | rewrites follow-ups into standalone questions; summarises long histories                             |
+| **Router/Classifier**    | `internal` / `web` / `both` / `clarify` / `direct`, with separate internal and web queries |
+| **Privacy guard**        | stops confidential terms from leaking into external web queries without approval                     |
+| **Internal RAG agent**   | ChromaDB semantic search over chunked docs with classification and date metadata                     |
+| **Web research agent**   | Tavily search                                                                                        |
+| **Validator**            | grades relevance and drops noise; triggers query reformulation when nothing is relevant              |
+| **Conflict detector**    | structured internal vs external disagreements, with dates and likely resolution                      |
+| **Synthesizer**          | evidence-only answer with `[S#]` citations and an explicit claim list                              |
+| **Groundedness checker** | verifies each claim against its cited source; forces regeneration on hallucinations                  |
+| **Approval gate**        | human review for confidential sources or low-confidence answers                                      |
 
 Full details are in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
@@ -72,12 +73,12 @@ A `Makefile` wraps these (`make install ingest serve chat demo eval test`).
 
 ### Using real providers
 
-| Variable | Effect |
-|---|---|
-| `OPENROUTER_API_KEY` | switches the LLM from the offline mock to OpenRouter (`SMART_MODEL=anthropic/claude-sonnet-5.5`, `FAST_MODEL=anthropic/claude-haiku-5.5` by default; change them to any OpenRouter model id that supports structured outputs) |
-| `OPENROUTER_FALLBACK_MODELS` | optional JSON list of models OpenRouter falls back to if the primary fails |
-| `TAVILY_API_KEY` | switches web search from fixtures to Tavily (free tier at tavily.com) |
-| `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY` | full LangGraph traces in LangSmith |
+| Variable                                           | Effect                                                                                                                                                                                                                            |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPENROUTER_API_KEY`                             | switches the LLM from the offline mock to OpenRouter (`SMART_MODEL=anthropic/claude-sonnet-5.5`, `FAST_MODEL=anthropic/claude-haiku-5.5` by default; change them to any OpenRouter model id that supports structured outputs) |
+| `OPENROUTER_FALLBACK_MODELS`                     | optional JSON list of models OpenRouter falls back to if the primary fails                                                                                                                                                        |
+| `TAVILY_API_KEY`                                 | switches web search from fixtures to Tavily (free tier at tavily.com)                                                                                                                                                             |
+| `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY` | full LangGraph traces in LangSmith                                                                                                                                                                                                |
 
 `GET /health` shows which providers are active. See `.env.example` for every setting (HITL toggles, thresholds, retry limits...).
 
@@ -87,18 +88,18 @@ A `Makefile` wraps these (`make install ingest serve chat demo eval test`).
 
 `scripts/demo.py` drives the real HTTP API and writes the transcript to **[docs/DEMO.md](docs/DEMO.md)**:
 
-| # | Scenario | Shows |
-|---|---|---|
-| 1 | "What is our parental leave policy and how many PTO days...?" | internal RAG with citations |
-| 2 | "Latest trends in real-time payments adoption?" | web-only routing |
-| 3 | "How do PayNova's current fees compare to our pricing?" | parallel internal + web retrieval, **conflict detected** (2025 doc says 2.4%, 2026 article says 1.9%) |
-| 4 | "Is our treasury Fed funds rate assumption still valid?" | stale internal assumption vs current data |
-| 5 | "What's the limit?" → "The API rate limit" | **clarification** interrupt and resume |
-| 6 | "What uptime does our SLA guarantee?" → "And what credits...if we miss it?" | **multi-turn context** |
-| 7 | "What is the status of Project Falcon?" | **HITL**: confidential sources need approval |
-| 8 | "Search the web for news about Project Falcon" | **HITL privacy guard**: reviewer blocks the leak, so internal-only |
-| 9 | "Policy on cryptocurrency staking rewards?" | hallucination guard: abstains |
-| 10 | `POST /documents` → approve → ask again | **HITL knowledge-base write**, immediately searchable |
+| #  | Scenario                                                                     | Shows                                                                                                       |
+| -- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 1  | "What is our parental leave policy and how many PTO days...?"                | internal RAG with citations                                                                                 |
+| 2  | "Latest trends in real-time payments adoption?"                              | web-only routing                                                                                            |
+| 3  | "How do PayNova's current fees compare to our pricing?"                      | parallel internal + web retrieval, **conflict detected** (2025 doc says 2.4%, 2026 article says 1.9%) |
+| 4  | "Is our treasury Fed funds rate assumption still valid?"                     | stale internal assumption vs current data                                                                   |
+| 5  | "What's the limit?" → "The API rate limit"                                  | **clarification** interrupt and resume                                                                |
+| 6  | "What uptime does our SLA guarantee?" → "And what credits...if we miss it?" | **multi-turn context**                                                                                |
+| 7  | "What is the status of Project Falcon?"                                      | **HITL**: confidential sources need approval                                                          |
+| 8  | "Search the web for news about Project Falcon"                               | **HITL privacy guard**: reviewer blocks the leak, so internal-only                                    |
+| 9  | "Policy on cryptocurrency staking rewards?"                                  | hallucination guard: abstains                                                                               |
+| 10 | `POST /documents` → approve → ask again                                  | **HITL knowledge-base write**, immediately searchable                                                 |
 
 The knowledge base (`data/docs/`, 21 docs) includes deliberately **stale** documents (2024 regulatory watch, 2024 treasury assumptions, 2025 competitor analysis) and **confidential** ones (acquisition plan, salary bands, board minutes) to exercise conflict detection and approvals.
 
@@ -106,27 +107,27 @@ The knowledge base (`data/docs/`, 21 docs) includes deliberately **stale** docum
 
 ## Requirements checklist
 
-| Requirement | Where |
-|---|---|
-| Natural-language queries | `POST /chat`, CLI `chat` |
-| Query classification and routing (internal / web / both) | `agents/router.py`, `graph/builder.py::route_after_classify, fan_out` |
-| RAG over internal KB | `rag/` (front-matter loader, header-aware chunking, ChromaDB, bge-small embeddings) |
-| Web search for current info | `tools/web_search.py` (Tavily via `langchain-tavily`) |
-| Multiple specialised agents that process and validate | 10 agent nodes in `agents/` (validator, conflict detector, groundedness checker...) |
-| Synthesis into one answer | `agents/synthesizer.py` |
-| Citations for every claim | `[S#]` markers, claim→source mapping, citation sanitising, `citations[]` in API |
-| Conflicting information | `agents/conflicts.py`: structured `conflicts[]` + answer section |
-| Clarification on ambiguity | `clarify` node with `interrupt()` + `/resume` |
-| Conversation context | SQLite checkpointer per `thread_id`, contextualizer, history summarisation |
-| Conditional routing | 5 conditional edges, including loops (clarify, reformulate, regenerate) and a parallel fan-out |
-| Retries for failed tool calls | `resilience.py` (tenacity, exponential backoff + jitter, non-retryable classification) |
-| Structured state | `graph/state.py` (Pydantic `ResearchState`, custom reducers) and Pydantic outputs for every agent |
-| Human-in-the-loop | 5 approval types (`docs/ARCHITECTURE.md#human-in-the-loop`) + `/approvals` queue |
-| Logging and observability | structlog with correlation IDs, per-node/LLM/tool metrics, `/metrics`, `/audit`, optional LangSmith |
-| Evaluation | `evaluation.py`: retrieval hit@k/recall@k/MRR, routing accuracy, LLM-as-judge faithfulness/relevance/citations/completeness |
-| API failures, empty retrieval, hallucination | per-agent fallbacks + warnings, reformulation then abstention, groundedness check + regeneration |
-| Persistence | SQLite (checkpoints + app DB) |
-| API docs, tests, diagram, README | `docs/API.md` + Swagger, `tests/`, `docs/ARCHITECTURE.md`, this file |
+| Requirement                                              | Where                                                                                                                         |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Natural-language queries                                 | `POST /chat`, CLI `chat`                                                                                                  |
+| Query classification and routing (internal / web / both) | `agents/router.py`, `graph/builder.py::route_after_classify, fan_out`                                                     |
+| RAG over internal KB                                     | `rag/` (front-matter loader, header-aware chunking, ChromaDB, bge-small embeddings)                                         |
+| Web search for current info                              | `tools/web_search.py` (Tavily via `langchain-tavily`)                                                                     |
+| Multiple specialised agents that process and validate    | 10 agent nodes in `agents/` (validator, conflict detector, groundedness checker...)                                         |
+| Synthesis into one answer                                | `agents/synthesizer.py`                                                                                                     |
+| Citations for every claim                                | `[S#]` markers, claim→source mapping, citation sanitising, `citations[]` in API                                          |
+| Conflicting information                                  | `agents/conflicts.py`: structured `conflicts[]` + answer section                                                          |
+| Clarification on ambiguity                               | `clarify` node with `interrupt()` + `/resume`                                                                           |
+| Conversation context                                     | SQLite checkpointer per `thread_id`, contextualizer, history summarisation                                                  |
+| Conditional routing                                      | 5 conditional edges, including loops (clarify, reformulate, regenerate) and a parallel fan-out                                |
+| Retries for failed tool calls                            | `resilience.py` (tenacity, exponential backoff + jitter, non-retryable classification)                                      |
+| Structured state                                         | `graph/state.py` (Pydantic `ResearchState`, custom reducers) and Pydantic outputs for every agent                         |
+| Human-in-the-loop                                        | 5 approval types (`docs/ARCHITECTURE.md#human-in-the-loop`) + `/approvals` queue                                          |
+| Logging and observability                                | structlog with correlation IDs, per-node/LLM/tool metrics, `/metrics`, `/audit`, optional LangSmith                       |
+| Evaluation                                               | `evaluation.py`: retrieval hit@k/recall@k/MRR, routing accuracy, LLM-as-judge faithfulness/relevance/citations/completeness |
+| API failures, empty retrieval, hallucination             | per-agent fallbacks + warnings, reformulation then abstention, groundedness check + regeneration                              |
+| Persistence                                              | SQLite (checkpoints + app DB)                                                                                                 |
+| API docs, tests, diagram, README                         | `docs/API.md` + Swagger, `tests/`, `docs/ARCHITECTURE.md`, this file                                                    |
 
 ---
 
@@ -157,12 +158,12 @@ docs/             ARCHITECTURE.md · API.md · DEMO.md · *.mmd diagrams
 
 `reports/eval_report.md` is regenerated by `make eval`. In offline mock mode (keyword router, extractive synthesis, lexical judge) with local bge-small embeddings:
 
-| metric | value |
-|---|---|
-| retrieval hit@5 / recall@5 / MRR | 1.0 / 1.0 / 0.98 |
-| routing accuracy | 0.90 |
-| conflict detection rate (3 seeded conflicts) | 1.0 |
-| abstention on unanswerable question | 1.0 |
+| metric                                       | value            |
+| -------------------------------------------- | ---------------- |
+| retrieval hit@5 / recall@5 / MRR             | 1.0 / 1.0 / 0.98 |
+| routing accuracy                             | 0.90             |
+| conflict detection rate (3 seeded conflicts) | 1.0              |
+| abstention on unanswerable question          | 1.0              |
 
 Answer-quality judge scores in mock mode are heuristic. Run with an OpenRouter key for real LLM-as-judge numbers.
 
